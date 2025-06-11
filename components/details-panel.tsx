@@ -20,8 +20,8 @@ export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
     <div className="bg-gray-50 border-l border-gray-200 flex flex-col h-full w-full">
       {detailContent ? (
         <>
-          <div className="p-4 h-20 border-b border-gray-200">
-            <h2 className="text-lg font-semibold">{detailContent.title}</h2>
+          <div className="flex p-4 h-20 border-b border-gray-200">
+            <h2 className="my-auto text-lg font-semibold">{detailContent.title}</h2>
           </div>
           <ScrollArea className="flex-1 p-4">
             <div className="prose prose-sm max-w-none">

@@ -36,8 +36,8 @@ export default function Sidebar({
 
   return (
     <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
-      <div className="p-4 h-20 border-b border-gray-200">
-        <h2 className="text-lg font-semibold">AI Coding Agent</h2>
+      <div className="flex h-20 border-b border-gray-200">
+        <h2 className="m-auto text-lg font-semibold">AI Coding Agent</h2>
       </div>
 
       <div className="p-4">
@@ -83,8 +83,8 @@ export default function Sidebar({
         )}
       </div>
 
-      <div className="p-4 h-20 border-t border-gray-200">
-        <div className="flex items-center gap-2">
+      <div className="flex h-20 border-t border-gray-200">
+        <div className="flex m-auto items-center gap-2">
           <div className="h-8 w-8 rounded-full bg-gray-300"></div>
           <div className="text-sm font-medium">AIAE超管</div>
         </div>
