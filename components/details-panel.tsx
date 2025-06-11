@@ -16,7 +16,9 @@ export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
           </div>
           <ScrollArea className="flex-1 p-4">
             <div className="prose prose-sm max-w-none">
-              <ReactMarkdown>{detailContent.content}</ReactMarkdown>
+              <pre>
+                <code>{detailContent.content}</code>
+              </pre>
             </div>
           </ScrollArea>
         </>
