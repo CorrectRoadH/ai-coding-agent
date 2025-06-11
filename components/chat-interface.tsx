@@ -99,17 +99,22 @@ export default function ChatInterface({
                   message.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900"
                 }`}
               >
-                {message.role === "user" ? (
-                  <ReactMarkdown
-                    components={{
-                      div: ({ node, ...props }) => <div className="prose prose-invert max-w-none" {...props} />,
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                ) : (
-                  <p>{message.content}</p>
-                )}
+                <ReactMarkdown
+                  components={{
+                    div: ({ node, ...props }) => (
+                      <div
+                        className={`prose ${
+                          message.role === "user" ? "prose-invert" : ""
+                        } max-w-none text-current`}
+                        {...props}
+                      />
+                    ),
+                    p: ({ node, ...props }) => <p className="my-2 first:mt-0 last:mb-0" {...props} />,
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+
                 {message.actions && message.actions.length > 0 && message.role === "assistant" && (
                   <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-gray-200">
                     {message.actions.map((action) => renderActionButton(action, message.id))}

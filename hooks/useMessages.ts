@@ -201,122 +201,114 @@ export function useMessages(
     }
   }, [])
 
+  const _generateStreamingResponse = useCallback(
+    async (userContent: string, targetChatId: string, targetAgent: AgentType, currentMessages: ChatMessage[]) => {
+      setLoading(true)
+      setError(null)
+
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        content: userContent,
+        role: "user",
+        timestamp: new Date(),
+      }
+
+      const messagesWithUser = [...currentMessages, userMessage]
+      setMessages(messagesWithUser)
+      if (onUpdateChatMessages) {
+        onUpdateChatMessages(targetChatId, messagesWithUser)
+      }
+
+      const assistantMessageId = (Date.now() + 1).toString()
+      const placeholderAiResponse: ChatMessage = {
+        id: assistantMessageId,
+        content: "思考中...",
+        role: "assistant",
+        timestamp: new Date(),
+        actions: [],
+        detailContent: "",
+      }
+
+      setMessages((prevMessages) => [...prevMessages, placeholderAiResponse])
+
+      const detail: DetailContent = {
+        id: assistantMessageId,
+        title: `${getAgentTitle(targetAgent)} 详情`,
+        content: "",
+      }
+      setDetailContent(detail)
+
+      let streamInterval: NodeJS.Timeout | undefined
+
+      try {
+        const fullDetailContent = generateDetailContent(targetAgent)
+        const chunks = fullDetailContent.split(/(\s+)/)
+        let streamedContent = ""
+
+        streamInterval = setInterval(() => {
+          if (chunks.length > 0) {
+            const chunk = chunks.shift()!
+            streamedContent += chunk
+            setDetailContent({ ...detail, content: streamedContent })
+          } else {
+            clearInterval(streamInterval)
+
+            const finalAiResponse: ChatMessage = {
+              ...placeholderAiResponse,
+              content: generateResponse(targetAgent, userContent),
+              detailContent: fullDetailContent,
+              actions: generateMessageActions(targetAgent),
+            }
+
+            setMessages((prevMessages) => {
+              const updatedMessages = prevMessages.map((msg) => (msg.id === assistantMessageId ? finalAiResponse : msg))
+              if (onUpdateChatMessages) {
+                onUpdateChatMessages(targetChatId, updatedMessages)
+              }
+              return updatedMessages
+            })
+            setLoading(false)
+          }
+        }, 50)
+      } catch (err) {
+        if (streamInterval) clearInterval(streamInterval)
+        const errorMessage = err instanceof Error ? err.message : "生成响应时出错"
+        setError(errorMessage)
+        const errorAiResponse: ChatMessage = {
+          ...placeholderAiResponse,
+          content: `错误: ${errorMessage}`,
+        }
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) => (msg.id === assistantMessageId ? errorAiResponse : msg)),
+        )
+        setLoading(false)
+      }
+    },
+    [getAgentTitle, generateMessageActions, onUpdateChatMessages],
+  )
+
   // 发送消息
   const sendMessage = useCallback(
     async (content: string) => {
       if (!agent || !chatId) return null
 
-      setLoading(true)
-      setError(null)
-      try {
-        // 创建用户消息
-        const userMessage: ChatMessage = {
-          id: Date.now().toString(),
-          content,
-          role: "user",
-          timestamp: new Date(),
-        }
-
-        const newMessages = [...messages, userMessage]
-        setMessages(newMessages)
-
-        // 立即更新对话列表中的消息
-        if (onUpdateChatMessages) {
-          onUpdateChatMessages(chatId, newMessages)
-        }
-
-        // 模拟API调用延迟
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // 创建AI响应 - 简短回复 + 详细内容
-        const detailContent = generateDetailContent(agent)
-        const aiResponse: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          content: generateResponse(agent, content), // 简短回复
-          role: "assistant",
-          timestamp: new Date(),
-          actions: generateMessageActions(agent),
-          detailContent: detailContent, // 详细内容存储在这里
-        }
-
-        const finalMessages = [...newMessages, aiResponse]
-        setMessages(finalMessages)
-
-        // 更新对话列表中的消息
-        if (onUpdateChatMessages) {
-          onUpdateChatMessages(chatId, finalMessages)
-        }
-
-        return aiResponse
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "发送消息失败")
-        return null
-      } finally {
-        setLoading(false)
-      }
+      await _generateStreamingResponse(content, chatId, agent, messages)
+      return null
     },
-    [agent, chatId, messages, onUpdateChatMessages, generateMessageActions, getAgentTitle],
+    [agent, chatId, messages, _generateStreamingResponse],
   )
 
   // 发送消息（支持直接传入chatId和指定agent类型）
   const sendMessageWithChatId = useCallback(
     async (content: string, targetChatId: string, targetAgent?: AgentType) => {
-      // 修复：使用传入的 targetAgent 或当前的 agent
       const effectiveAgent = targetAgent || agent
       if (!effectiveAgent) return null
 
-      setLoading(true)
-      setError(null)
-      try {
-        // 创建用户消息
-        const userMessage: ChatMessage = {
-          id: Date.now().toString(),
-          content,
-          role: "user",
-          timestamp: new Date(),
-        }
-
-        // 修复：对于新对话，从空白开始，不使用当前的 messages
-        const currentMessages = targetChatId === chatId ? messages : []
-        const newMessages = [...currentMessages, userMessage]
-        setMessages(newMessages)
-
-        // 立即更新对话列表中的消息
-        if (onUpdateChatMessages) {
-          onUpdateChatMessages(targetChatId, newMessages)
-        }
-
-        // 模拟API调用延迟
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // 创建AI响应 - 简短回复 + 详细内容
-        const detailContent = generateDetailContent(effectiveAgent)
-        const aiResponse: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          content: generateResponse(effectiveAgent, content), // 简短回复
-          role: "assistant",
-          timestamp: new Date(),
-          actions: generateMessageActions(effectiveAgent),
-          detailContent: detailContent, // 详细内容存储在这里
-        }
-
-        const finalMessages = [...newMessages, aiResponse]
-        setMessages(finalMessages)
-
-        // 更新对话列表中的消息
-        if (onUpdateChatMessages) {
-          onUpdateChatMessages(targetChatId, finalMessages)
-        }
-
-        return aiResponse
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "发送消息失败")
-        return null
-      } finally {
-        setLoading(false)
-      }
+      const currentMessages = targetChatId === chatId ? messages : []
+      await _generateStreamingResponse(content, targetChatId, effectiveAgent, currentMessages)
+      return null
     },
-    [agent, messages, chatId, onUpdateChatMessages, generateMessageActions, getAgentTitle],
+    [agent, messages, chatId, _generateStreamingResponse],
   )
 
   // 处理消息操作
