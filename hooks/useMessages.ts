@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import type { ChatMessage, AgentType, DetailContent, MessageAction } from "@/types/agent"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { useAgents } from "./useAgents" // 导入 useAgents hook
 
 // 生成简短响应内容的辅助函数
@@ -182,7 +182,6 @@ export function useMessages(
   const [detailContent, setDetailContent] = useState<DetailContent | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
   const { getAgentTitle, generateMessageActions } = useAgents() // 从 useAgents 导入
 
   // 获取消息
@@ -343,9 +342,8 @@ export function useMessages(
           // 复制详细内容
           if (message.role === "assistant" && message.detailContent) {
             navigator.clipboard.writeText(message.detailContent).then(() => {
-              toast({
-                title: "复制成功",
-                description: `内容已复制到剪贴板。`,
+              toast.success("复制成功", {
+                description: `内容已复制到剪贴板`,
               })
             })
           }

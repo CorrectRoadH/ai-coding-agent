@@ -23,6 +23,7 @@ export default function Home() {
     createChatOptimistic,
     updateChatMessages,
     updateChatTitle,
+    deleteChat,
     getChat,
   } = useChats()
 
@@ -115,17 +116,30 @@ export default function Home() {
   const handleChatSelect = (chatId: string) => {
     const selectedChat = getChat(chatId)
     if (selectedChat) {
+      // 切换对话时，先清空当前消息和详细内容
+      clearMessages()
+
       setSelectedChatId(chatId)
       setSelectedAgent(selectedChat.agent)
       // 传递历史对话的 agent 类型给 setMessagesData
       setMessagesData(selectedChat.messages, selectedChat.agent)
 
-      // 如果有历史消息且最后一条是助手消息且有详情，则显示详情
-      const lastMessage = selectedChat.messages[selectedChat.messages.length - 1]
-      if (lastMessage && lastMessage.role === "assistant" && lastMessage.hasDetail) {
-        viewDetail(lastMessage.id)
-      }
+      // 移除自动显示最后一个消息详情的逻辑，以确保右侧面板被清空
+      // const lastMessage = selectedChat.messages[selectedChat.messages.length - 1]
+      // if (lastMessage && lastMessage.role === "assistant" && lastMessage.detailContent) {
+      //   viewDetail(lastMessage.id)
+      // }
     }
+  }
+
+  // 新增：处理删除对话
+  const handleDeleteChat = async (chatId: string) => {
+    const success = await deleteChat(chatId)
+    if (success && selectedChatId === chatId) {
+      // 如果删除的是当前选中的对话，则返回新建对话界面
+      handleNewChat()
+    }
+    // 如果删除的不是当前选中的对话，侧边栏会自动更新，无需额外操作
   }
 
   return (
@@ -135,6 +149,7 @@ export default function Home() {
         selectedChatId={selectedChatId}
         onChatSelect={handleChatSelect}
         onNewChat={handleNewChat}
+        onDeleteChat={handleDeleteChat}
         loading={chatsLoading}
       />
 

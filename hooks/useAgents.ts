@@ -40,7 +40,9 @@ export function useAgents() {
 
   const getAgentTitle = (agent: AgentType): string => {
     const foundAgent = agents.find((a) => a.id === agent)
-    return foundAgent ? foundAgent.title : "未知 Agent"
+    const baseTitle = foundAgent ? foundAgent.title : "未知 Agent"
+    // 去掉 " Agent" 后缀并截取前两个字
+    return baseTitle.replace(/ Agent$/, "").slice(0, 2)
   }
 
   // 生成消息操作按钮
