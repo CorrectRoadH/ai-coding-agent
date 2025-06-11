@@ -5,9 +5,12 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import type { AgentType, ChatMessage, MessageAction } from "@/types/agent"
 import { ArrowLeft, Send, Loader2, FileText, Copy, ArrowRight, Code, Download } from "lucide-react"
 import { useAgents } from "@/hooks/useAgents"
+import DetailsPanel from "./details-panel"
+import ReactMarkdown from "react-markdown"
 
 interface ChatInterfaceProps {
   agent: AgentType
@@ -96,7 +99,17 @@ export default function ChatInterface({
                   message.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900"
                 }`}
               >
-                <div className="mb-2">{message.content}</div>
+                {message.role === "user" ? (
+                  <ReactMarkdown
+                    components={{
+                      div: ({ node, ...props }) => <div className="prose prose-invert max-w-none" {...props} />,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                ) : (
+                  <p>{message.content}</p>
+                )}
                 {message.actions && message.actions.length > 0 && message.role === "assistant" && (
                   <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-gray-200">
                     {message.actions.map((action) => renderActionButton(action, message.id))}
