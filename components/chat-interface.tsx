@@ -78,7 +78,7 @@ export default function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center">
+      <div className="p-4  h-20 border-b border-gray-200 flex items-center">
         <Button variant="ghost" size="icon" className="mr-2" onClick={onBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -132,7 +132,7 @@ export default function ChatInterface({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 h-20 border-t border-gray-200">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={input}
