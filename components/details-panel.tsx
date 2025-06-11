@@ -1,12 +1,21 @@
 import type { DetailContent } from "@/types/agent"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import ReactMarkdown from "react-markdown"
+import { useEffect, useRef } from "react"
 
 interface DetailsPanelProps {
   detailContent: DetailContent | null
 }
 
 export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [detailContent?.content])
+
   return (
     <div className="bg-gray-50 border-l border-gray-200 flex flex-col h-full w-full">
       {detailContent ? (
@@ -20,6 +29,7 @@ export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
                 <code>{detailContent.content}</code>
               </pre>
             </div>
+            <div ref={scrollRef} />
           </ScrollArea>
         </>
       ) : (
