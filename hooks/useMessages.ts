@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { fetchEventSource, type EventSourceMessage } from "@microsoft/fetch-event-source"
-import type { ChatMessage, AgentType, DetailContent, MessageAction } from "@/types/agent"
+import type { ChatMessage, AgentType, DetailContent, MessageAction, Step } from "@/types/agent"
 import { toast } from "sonner"
 import { useAgents } from "./useAgents" // 导入 useAgents hook
 import * as streamingjson from "streaming-json"
@@ -22,6 +22,34 @@ function generateResponse(agent: AgentType | null, message: string): string {
       return "我已经生成了代码实现，点击查看详细的代码和说明。"
     default:
       return "我收到了您的消息，但我不确定如何处理它。"
+  }
+}
+
+function getInitialSteps(agent: AgentType): Step[] {
+  switch (agent) {
+    case "requirements":
+      return [
+        { id: "query_database", title: "查询知识库", status: "pending" },
+        { id: "query_context", title: "查询上下文", status: "pending" },
+        { id: "agent_call", title: "调用 Agent", status: "pending" },
+        { id: "requirements_message", title: "生成需求", status: "pending" },
+      ]
+    case "planning":
+      return [
+        { id: "query_database", title: "查询知识库", status: "pending" },
+        { id: "query_context", title: "查询上下文", status: "pending" },
+        { id: "agent_call", title: "调用 Agent", status: "pending" },
+        { id: "plan_message", title: "生成计划", status: "pending" },
+      ]
+    case "coding":
+      return [
+        { id: "query_database", title: "查询知识库", status: "pending" },
+        { id: "query_context", title: "查询上下文", status: "pending" },
+        { id: "agent_call", title: "调用 Agent", status: "pending" },
+        { id: "coding_message", title: "生成代码", status: "pending" },
+      ]
+    default:
+      return []
   }
 }
 
@@ -86,10 +114,11 @@ export function useMessages(
 
       setMessages((prevMessages) => [...prevMessages, placeholderAiResponse])
 
+      const initialSteps = getInitialSteps(targetAgent)
       const detail: DetailContent = {
         id: assistantMessageId,
-        title: `${getAgentTitle(targetAgent)} 详情`,
-        content: "",
+        title: `${getAgentTitle(targetAgent)} 过程`,
+        content: initialSteps,
       }
       setDetailContent(detail)
 
@@ -110,7 +139,9 @@ export function useMessages(
         let streamedContent = ""
         const ctrl = new AbortController()
         let lexer: any
-        lexer = new streamingjson.Lexer()
+        if (targetAgent === "planning") {
+          lexer = new streamingjson.Lexer()
+        }
         
 
         await fetchEventSource(getApiEndpoint(targetAgent), {
@@ -142,55 +173,69 @@ export function useMessages(
             if (event.data) {
               try {
                 const data = JSON.parse(event.data)
-                const updateAssistantMessage = (content: string) => {
-                  setMessages((prev) =>
-                    prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, content } : msg)),
-                  )
+                const eventId = data.event
+
+                const getEventText = (event: string) => {
+                  switch (event) {
+                    case "query_database":
+                      return "正在查询知识库..."
+                    case "query_context":
+                      return "正在查询上下文..."
+                    case "agent_call":
+                      return "正在调用 Agent..."
+                    case "plan_message":
+                      return "正在生成计划..."
+                    case "requirements_message":
+                      return "正在生成需求..."
+                    case "coding_message":
+                      return "正在生成代码..."
+                    default:
+                      return "思考中..."
+                  }
                 }
 
-                switch (data.event) {
-                  case "query_database":
-                    updateAssistantMessage("正在查询知识库...")
-                    break
-                  case "query_context":
-                    updateAssistantMessage("正在查询上下文...")
-                    break
-                  case "agent_call":
-                    updateAssistantMessage("正在调用 Agent...")
-                    break
-                  case "plan_message":
-                    updateAssistantMessage("正在生成计划...")
-                    if (data.content) {
-                      console.log("data.content", data.content)
-                      streamedContent += data.content
-                      if (lexer) {
-                        lexer.AppendString(data.content)
-                        try {
-                          const completedJson = lexer.CompleteJSON()
-                          setDetailContent((prev) => (prev ? { ...prev, content: JSON.parse(completedJson) } : null))
-                        } catch (e) {
-                          console.warn("Streaming JSON completion error, waiting for more data.", e)
-                          // 如果补全失败，暂时显示原始字符串
-                          setDetailContent((prev) => (prev ? { ...prev, content: streamedContent } : null))
+                // 更新左侧聊天气泡里的消息
+                setMessages((prev) =>
+                  prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, content: getEventText(eventId) } : msg)),
+                )
+
+                // 更新右侧详情面板的步骤状态
+                setDetailContent((prev) => {
+                  if (!prev || !Array.isArray(prev.content)) return prev
+
+                  let eventFound = false
+                  const updatedSteps = (prev.content as Step[]).map((step) => {
+                    if (eventFound) {
+                      return step // 未来的步骤保持不变
+                    }
+                    if (step.id === eventId) {
+                      eventFound = true
+                      let stepContent: any = step.content
+                      if (data.content) {
+                        if (eventId === "plan_message" && lexer) {
+                          streamedContent += data.content
+
+                          try {
+                            lexer.AppendString(data.content)
+
+                            const completedJson = lexer.CompleteJSON()
+                            stepContent = JSON.parse(completedJson)
+                          } catch (e) {
+                            console.log("error", e, streamedContent, data.content)
+                            // JSON 未完成，暂时不更新内容或显示原始文本
+                            stepContent = streamedContent
+                          }
+                        } else {
+                          stepContent = streamedContent
                         }
                       }
+                      return { ...step, status: "in_progress", content: stepContent }
                     }
-                    break
-                  case "requirements_message":
-                    updateAssistantMessage("正在生成需求...")
-                    break
-                  case "coding_message":
-                    updateAssistantMessage("正在生成代码...")
-                    if (data.content) {
-                      streamedContent += data.content
-                      // 实时更新详情内容
-                      setDetailContent((prev) => (prev ? { ...prev, content: streamedContent } : null))
-                    }
-                    break
-                  default:
-                    // 忽略未知事件
-                    break
-                }
+                    return { ...step, status: "completed" }
+                  })
+
+                  return { ...prev, content: updatedSteps }
+                })
               } catch (e) {
                 console.error("解析 SSE 数据失败", e)
               }
@@ -199,27 +244,44 @@ export function useMessages(
 
           onclose: () => {
             // 流关闭后处理最终内容
-            let finalContent: string | object = streamedContent
+            let finalContentForMessage: string | object = streamedContent
             if (targetAgent === "planning") {
               try {
-                // 尝试最终解析
-                finalContent = JSON.parse(streamedContent)
+                finalContentForMessage = JSON.parse(streamedContent)
               } catch (e) {
                 console.error("Final JSON parsing failed", e)
-                // 如果不是有效的 JSON，则按原样显示
-                finalContent = `\`\`\`\n${streamedContent}\n\`\`\``
+                finalContentForMessage = streamedContent
               }
-            } else if (targetAgent === "coding") {
-              // 对于代码，始终将其视为纯文本
-              finalContent = `\`\`\`\n${streamedContent}\n\`\`\``
             }
-            // 更新最终的详情内容
-            setDetailContent((prev) => (prev ? { ...prev, content: finalContent } : null))
+
+            // 更新最终的详情内容和步骤状态
+            setDetailContent((prev) => {
+              if (!prev || !Array.isArray(prev.content)) return prev
+
+              const finalSteps = (prev.content as Step[]).map((step) => {
+                const isContentStep =
+                  (targetAgent === "planning" && step.id === "plan_message") ||
+                  (targetAgent === "coding" && step.id === "coding_message") ||
+                  (targetAgent === "requirements" && step.id === "requirements_message")
+
+                let finalStepContent = step.content
+                if (isContentStep) {
+                  finalStepContent = finalContentForMessage
+                }
+
+                return {
+                  ...step,
+                  status: step.status !== "pending" ? "completed" : "pending",
+                  content: finalStepContent,
+                }
+              })
+              return { ...prev, content: finalSteps }
+            })
 
             const finalAiResponse: ChatMessage = {
               ...placeholderAiResponse,
               content: generateResponse(targetAgent, userContent),
-              detailContent: finalContent,
+              detailContent: finalContentForMessage, // 消息中存储最终产物
               actions: generateMessageActions(targetAgent),
             }
 

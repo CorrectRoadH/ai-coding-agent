@@ -18,10 +18,17 @@ export interface MessageAction {
   disabled?: boolean
 }
 
+export interface Step {
+  id: string
+  title: string
+  status: "pending" | "in_progress" | "completed" | "error"
+  content?: any
+}
+
 export interface DetailContent {
   id: string
   title: string
-  content: string | object
+  content: string | object | Step[]
 }
 
 export interface ChatHistoryItem {

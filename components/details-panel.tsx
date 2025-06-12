@@ -1,7 +1,8 @@
-import type { DetailContent } from "@/types/agent"
+import type { DetailContent, Step } from "@/types/agent"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useEffect, useRef, ElementRef } from "react"
 import PlanDisplay from "./plan-display"
+import StepDisplay from "./step-display"
 
 interface DetailsPanelProps {
   detailContent: DetailContent | null
@@ -10,23 +11,22 @@ interface DetailsPanelProps {
 export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
   const scrollAreaRef = useRef<ElementRef<typeof ScrollArea>>(null)
 
-  const isPlan = typeof detailContent?.content === "object" && detailContent?.content !== null
+  const isSteps = Array.isArray(detailContent?.content)
+  const isPlan = typeof detailContent?.content === "object" && detailContent?.content !== null && !isSteps
 
   useEffect(() => {
-    console.log("detailContent", detailContent)
     if (scrollAreaRef.current) {
       const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
       if (viewport) {
         setTimeout(() => {
-          if (!isPlan) {
-            viewport.scrollTop = viewport.scrollHeight
-          }
+          viewport.scrollTop = viewport.scrollHeight
+            
         }, 100)
       }
     }
-  }, [detailContent, isPlan])
+  }, [detailContent, isSteps, isPlan])
 
-  const hasContent = detailContent && (isPlan || (typeof detailContent.content === 'string' && detailContent.content.length > 0));
+  const hasContent = detailContent && (isSteps || isPlan || (typeof detailContent.content === 'string' && detailContent.content.length > 0));
 
   return (
     <div className="bg-white border-l border-gray-200 flex flex-col h-full w-full">
@@ -36,8 +36,12 @@ export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
             <h2 className="my-auto text-lg font-semibold">{detailContent.title}</h2>
           </div>
           <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
-             <div className="p-4">
-              {isPlan ? (
+             <div className="p-4 space-y-4">
+              {isSteps ? (
+                (detailContent?.content as Step[]).map((step, index) => (
+                  <StepDisplay key={index} step={step} />
+                ))
+              ) : isPlan ? (
                 <PlanDisplay plan={detailContent.content as any} />
               ) : (
                 <pre className="prose prose-sm max-w-none whitespace-pre-wrap break-words">

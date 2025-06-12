@@ -110,12 +110,12 @@ const ProjectMemoryDisplay: React.FC<{ memory: ProjectMemory }> = ({ memory }) =
     <CardHeader>
       <CardTitle className="text-base flex items-center">
         <BrainCircuit className="h-5 w-5 mr-2 text-purple-500" />
-        {memory.title}
+        {memory?.title}
       </CardTitle>
     </CardHeader>
     <CardContent>
       <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-        {memory.points.map((point, index) => (
+        {memory?.points?.map((point, index) => (
           <li key={index}>{point}</li>
         ))}
       </ul>
