@@ -139,7 +139,7 @@ export function useMessages(
         let streamedContent = ""
         const ctrl = new AbortController()
         let lexer: any
-        if (targetAgent === "planning") {
+        if (targetAgent === "planning" || targetAgent === "coding") {
           lexer = new streamingjson.Lexer()
         }
         
@@ -212,21 +212,26 @@ export function useMessages(
                       eventFound = true
                       let stepContent: any = step.content
                       if (data.content) {
-                        if (eventId === "plan_message" && lexer) {
-                          streamedContent += data.content
+                        const isStreamableJsonEvent =
+                          (eventId === "plan_message" || eventId === "coding_message") && lexer
 
+                        if (isStreamableJsonEvent) {
+                          streamedContent += data.content
                           try {
-                            lexer.AppendString(data.content)
+                            console.log("streamedContent",data.content, streamedContent)
+                            lexer.AppendString(streamedContent)
 
                             const completedJson = lexer.CompleteJSON()
                             stepContent = JSON.parse(completedJson)
+                            // 关键修复：在成功解析后，重置lexer以防止重复解析旧内容
+                            lexer = new streamingjson.Lexer()
+                            streamedContent = "" // 关键修复：同时重置 streamedContent
                           } catch (e) {
-                            console.log("error", e, streamedContent, data.content)
-                            // JSON 未完成，暂时不更新内容或显示原始文本
-                            stepContent = streamedContent
+                            // JSON不完整，暂时不更新内容，等待更多数据
+                            // console.log("Incomplete JSON, waiting for more data...", streamedContent)
                           }
                         } else {
-                          stepContent = streamedContent
+                          // 对于非流式JSON内容或其他事件，目前不进行累加，因为可能导致格式问题
                         }
                       }
                       return { ...step, status: "in_progress", content: stepContent }
@@ -245,7 +250,7 @@ export function useMessages(
           onclose: () => {
             // 流关闭后处理最终内容
             let finalContentForMessage: string | object = streamedContent
-            if (targetAgent === "planning") {
+            if (targetAgent === "planning" || targetAgent === "coding") {
               try {
                 finalContentForMessage = JSON.parse(streamedContent)
               } catch (e) {
