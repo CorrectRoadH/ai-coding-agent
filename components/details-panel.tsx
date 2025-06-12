@@ -2,17 +2,24 @@ import type { DetailContent } from "@/types/agent"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import ReactMarkdown from "react-markdown"
 import { useEffect, useRef } from "react"
+import remarkGfm from "remark-gfm"
+import rehypeRaw from "rehype-raw"
 
 interface DetailsPanelProps {
   detailContent: DetailContent | null
 }
 
 export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" })
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.parentElement?.querySelector(
+        '[data-radix-scroll-area-viewport]',
+      )
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight
+      }
     }
   }, [detailContent?.content])
 
@@ -24,12 +31,11 @@ export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
             <h2 className="my-auto text-lg font-semibold">{detailContent.title}</h2>
           </div>
           <ScrollArea className="flex-1 p-4">
-            <div className="prose prose-sm max-w-none">
-              <pre>
-                <code>{detailContent.content}</code>
-              </pre>
+            <div className="prose prose-sm max-w-none" ref={scrollAreaRef}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                {detailContent.content}
+              </ReactMarkdown>
             </div>
-            <div ref={scrollRef} />
           </ScrollArea>
         </>
       ) : (

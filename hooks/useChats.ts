@@ -51,7 +51,7 @@ const initialChats: ChatHistoryItem[] = [
 ]
 
 export function useChats() {
-  const [chats, setChats] = useState<ChatHistoryItem[]>(initialChats)
+  const [chats, setChats] = useState<ChatHistoryItem[]>([])
   const [isMounted, setIsMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,9 +70,13 @@ export function useChats() {
           })),
         }))
         setChats(parsedChats)
+      } else {
+        // 如果没有历史记录，则使用初始数据
+        setChats(initialChats)
+        localStorage.setItem("chats-history", JSON.stringify(initialChats))
       }
     } catch (error) {
-      console.error("Error reading from localStorage", error)
+      console.error("从localStorage读取数据时出错", error)
       setChats(initialChats)
       localStorage.setItem("chats-history", JSON.stringify(initialChats))
     }
@@ -100,15 +104,21 @@ export function useChats() {
 
   // 创建新对话 - 乐观更新版本
   const createChatOptimistic = useCallback(
-    (agent: AgentType, firstMessage: string) => {
-      // 生成临时ID和标题
-      const tempId = `temp-${Date.now()}`
-      const agentTitle = getAgentTitle(agent) // 使用从 useAgents 导入的 getAgentTitle
-      const title = `${agentTitle}：${firstMessage.slice(0, 10)}${
-        firstMessage.length > 10 ? "..." : ""
+    (
+      agent: AgentType,
+      firstMessage: string,
+      sendMessageCallback: (
+        content: string,
+        targetChatId: string,
+        targetAgent: AgentType,
+      ) => Promise<null>,
+    ) => {
+      const tempId = crypto.randomUUID()
+      const agentTitle = getAgentTitle(agent)
+      const title = `${agentTitle}：${firstMessage.slice(0, 15)}${
+        firstMessage.length > 15 ? "..." : ""
       }`
 
-      // 立即创建新对话并添加到列表顶部
       const newChat: ChatHistoryItem = {
         id: tempId,
         title,
@@ -117,6 +127,10 @@ export function useChats() {
       }
 
       setChats((prev) => [newChat, ...prev])
+
+      // 创建后立即发送消息
+      sendMessageCallback(firstMessage, tempId, agent)
+
       return newChat
     },
     [getAgentTitle],
@@ -124,7 +138,19 @@ export function useChats() {
 
   // 更新对话消息
   const updateChatMessages = useCallback((chatId: string, messages: any[]) => {
-    setChats((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, messages } : chat)))
+    setChats((prev) =>
+      prev.map((chat) => {
+        if (chat.id === chatId) {
+          // 在这里更新真实ID
+          const realId = messages.find((m) => m.role === "assistant")?.id
+          if (realId && chat.id.startsWith("temp-")) {
+            return { ...chat, id: realId, messages }
+          }
+          return { ...chat, messages }
+        }
+        return chat
+      }),
+    )
   }, [])
 
   // 更新对话标题（当有了真实内容后）
@@ -140,7 +166,7 @@ export function useChats() {
       // 模拟API调用
       await new Promise((resolve) => setTimeout(resolve, 300))
       const newChat: ChatHistoryItem = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         title,
         agent,
         messages: [],
@@ -174,12 +200,9 @@ export function useChats() {
   }, [])
 
   // 获取单个对话
-  const getChat = useCallback(
-    (chatId: string) => {
-      return chats.find((chat) => chat.id === chatId) || null
-    },
-    [chats],
-  )
+  const getChat = useCallback((chatId: string) => chats.find((chat) => chat.id === chatId) || null, [
+    chats,
+  ])
 
   return {
     chats,

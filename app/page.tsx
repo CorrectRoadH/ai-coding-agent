@@ -28,34 +28,21 @@ export default function Home() {
   } = useChats()
 
   // 处理进入下一阶段 - 修复：传递正确的 agent 类型
-  const handleNextStage = async (nextAgent: AgentType, initialMessage?: string) => {
-    console.log("handleNextStage called with:", nextAgent, initialMessage ? "with message" : "no message")
-
+  const handleNextStage = (nextAgent: AgentType, initialMessage?: string) => {
     // 1. 立即清除当前消息状态
     clearMessages()
 
-    // 2. 创建新对话
+    // 2. 创建新对话并发送初始消息
     const firstMessageContent = initialMessage || `开始 ${nextAgent} 阶段`
-    const newChat = createChatOptimistic(nextAgent, firstMessageContent)
-    console.log("Created new chat:", newChat)
+    const newChat = createChatOptimistic(
+      nextAgent,
+      firstMessageContent,
+      sendMessageWithChatId,
+    )
 
     // 3. 切换到新对话
     setSelectedAgent(nextAgent)
     setSelectedChatId(newChat.id)
-
-    // 4. 再次确保消息被清空
-    setTimeout(() => {
-      clearMessages()
-    }, 0)
-
-    // 5. 如果有初始消息，发送它（传递正确的 agent 类型）
-    if (initialMessage) {
-      setTimeout(async () => {
-        console.log("Sending initial message to new chat:", newChat.id, "with agent:", nextAgent)
-        // 修复：传递 nextAgent 作为第三个参数
-        await sendMessageWithChatId(initialMessage, newChat.id, nextAgent)
-      }, 100)
-    }
   }
 
   // 使用自定义hook获取消息
@@ -93,13 +80,14 @@ export default function Home() {
     // 如果是新对话（没有选中的chatId），先创建对话
     let currentChatId = selectedChatId
     if (!currentChatId) {
-      // 乐观更新：立即创建新对话并添加到列表
-      const newChat = createChatOptimistic(selectedAgent, content)
+      // 乐观更新：立即创建新对话并发送消息
+      const newChat = createChatOptimistic(
+        selectedAgent,
+        content,
+        sendMessageWithChatId,
+      )
       currentChatId = newChat.id
       setSelectedChatId(currentChatId)
-
-      // 直接调用消息发送，传入新的 chatId 和正确的 agent
-      await sendMessageWithChatId(content, currentChatId, selectedAgent)
     } else {
       // 使用现有的对话ID发送消息
       await sendMessage(content)
