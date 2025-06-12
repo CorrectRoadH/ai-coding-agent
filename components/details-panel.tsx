@@ -1,45 +1,54 @@
 import type { DetailContent } from "@/types/agent"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import ReactMarkdown from "react-markdown"
-import { useEffect, useRef } from "react"
-import remarkGfm from "remark-gfm"
-import rehypeRaw from "rehype-raw"
+import { useEffect, useRef, ElementRef } from "react"
+import PlanDisplay from "./plan-display"
 
 interface DetailsPanelProps {
   detailContent: DetailContent | null
 }
 
 export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<ElementRef<typeof ScrollArea>>(null)
+
+  const isPlan = typeof detailContent?.content === "object" && detailContent?.content !== null
 
   useEffect(() => {
+    console.log("detailContent", detailContent)
     if (scrollAreaRef.current) {
-      const viewport = scrollAreaRef.current.parentElement?.querySelector(
-        '[data-radix-scroll-area-viewport]',
-      )
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
       if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight
+        setTimeout(() => {
+          if (!isPlan) {
+            viewport.scrollTop = viewport.scrollHeight
+          }
+        }, 100)
       }
     }
-  }, [detailContent?.content])
+  }, [detailContent, isPlan])
+
+  const hasContent = detailContent && (isPlan || (typeof detailContent.content === 'string' && detailContent.content.length > 0));
 
   return (
-    <div className="bg-gray-50 border-l border-gray-200 flex flex-col h-full w-full">
-      {detailContent ? (
+    <div className="bg-white border-l border-gray-200 flex flex-col h-full w-full">
+      {hasContent ? (
         <>
           <div className="flex p-4 h-20 border-b border-gray-200">
             <h2 className="my-auto text-lg font-semibold">{detailContent.title}</h2>
           </div>
-          <ScrollArea className="flex-1 p-4">
-            <div className="prose prose-sm max-w-none" ref={scrollAreaRef}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                {detailContent.content}
-              </ReactMarkdown>
-            </div>
+          <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
+             <div className="p-4">
+              {isPlan ? (
+                <PlanDisplay plan={detailContent.content as any} />
+              ) : (
+                <pre className="prose prose-sm max-w-none whitespace-pre-wrap break-words">
+                  {typeof detailContent.content === "string" ? detailContent.content : ""}
+                </pre>
+              )}
+             </div>
           </ScrollArea>
         </>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-500 p-4 text-center">
+        <div className="flex-1 flex items-center justify-center text-gray-500 p-4 text-center bg-gray-50">
           <p>选择一个 Agent 并开始对话，详细内容将显示在这里</p>
         </div>
       )}

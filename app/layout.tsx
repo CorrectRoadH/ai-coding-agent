@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/sonner"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "AI Coding Agent",
+  title: "AI Coding",
   description: "An AI-powered coding assistant with requirements analysis, planning, and code generation",
     generator: 'v0.dev'
 }

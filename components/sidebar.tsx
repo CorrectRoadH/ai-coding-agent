@@ -37,7 +37,7 @@ export default function Sidebar({
   return (
     <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
       <div className="flex h-20 border-b border-gray-200">
-        <h2 className="m-auto text-lg font-semibold">AI Coding Agent</h2>
+        <h2 className="m-auto text-lg font-semibold">AI Coding</h2>
       </div>
 
       <div className="p-4">

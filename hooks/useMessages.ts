@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { fetchEventSource, type EventSourceMessage } from "@microsoft/fetch-event-source"
 import type { ChatMessage, AgentType, DetailContent, MessageAction } from "@/types/agent"
 import { toast } from "sonner"
 import { useAgents } from "./useAgents" // 导入 useAgents hook
+import * as streamingjson from "streaming-json"
 
-const API_BASE_URL = "http://192.168.75.37:10001/api"
+const API_BASE_URL = "http://192.168.75.37:10002/api"
 
 // 生成简短响应内容的辅助函数
 function generateResponse(agent: AgentType | null, message: string): string {
@@ -97,7 +99,7 @@ export function useMessages(
             case "planning":
               return `${API_BASE_URL}/plan`
             case "requirements":
-              return `${API_BASE_URL}/requirements` // 假设的端点
+              return `${API_BASE_URL}/plan` // 假设的端点
             case "coding":
               return `${API_BASE_URL}/code` // 假设的端点
             default:
@@ -105,7 +107,13 @@ export function useMessages(
           }
         }
 
-        const res = await fetch(getApiEndpoint(targetAgent), {
+        let streamedContent = ""
+        const ctrl = new AbortController()
+        let lexer: any
+        lexer = new streamingjson.Lexer()
+        
+
+        await fetchEventSource(getApiEndpoint(targetAgent), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -116,96 +124,121 @@ export function useMessages(
             message_id: assistantMessageId,
             question: userContent,
           }),
-        })
+          signal: ctrl.signal,
 
-        if (!res.ok) {
-          throw new Error(`API 请求失败，状态码: ${res.status}`)
-        }
-        if (!res.body) {
-          throw new Error("API 未返回有效响应体")
-        }
+          onopen: async (response) => {
+            if (!response.ok) {
+              ctrl.abort()
+              throw new Error(`API 请求失败，状态码: ${response.status}`)
+            }
+          },
 
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ""
-        let streamedContent = ""
+          onmessage: (event: EventSourceMessage) => {
+            if (event.event === "message_end") {
+              ctrl.abort() // 正常结束时关闭连接
+              return
+            }
 
-        const processStream = async () => {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
+            if (event.data) {
+              try {
+                const data = JSON.parse(event.data)
+                const updateAssistantMessage = (content: string) => {
+                  setMessages((prev) =>
+                    prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, content } : msg)),
+                  )
+                }
 
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split("\\n")
-            buffer = lines.pop() || ""
-
-            for (const line of lines) {
-              if (line.startsWith("data:")) {
-                const jsonStr = line.substring(5).trim()
-                if (jsonStr) {
-                  const data = JSON.parse(jsonStr)
-
-                  const updateAssistantMessage = (content: string) => {
-                    setMessages((prev) =>
-                      prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, content } : msg)),
-                    )
-                  }
-
-                  switch (data.event) {
-                    case "query_database":
-                      updateAssistantMessage("正在查询数据库...")
-                      break
-                    case "query_context":
-                      updateAssistantMessage("正在查询上下文...")
-                      break
-                    case "agent_call":
-                      updateAssistantMessage("正在调用 Agent...")
-                      break
-                    case "plan_message":
-                    case "requirements_message":
-                    case "coding_message":
-                      if (data.detail) {
-                        streamedContent += data.detail
-                        setDetailContent({ ...detail, content: streamedContent })
-                      }
-                      break
-                    case "message_end":
-                      reader.cancel()
-                      let finalContent = streamedContent
-                      if (targetAgent === "planning") {
+                switch (data.event) {
+                  case "query_database":
+                    updateAssistantMessage("正在查询知识库...")
+                    break
+                  case "query_context":
+                    updateAssistantMessage("正在查询上下文...")
+                    break
+                  case "agent_call":
+                    updateAssistantMessage("正在调用 Agent...")
+                    break
+                  case "plan_message":
+                    updateAssistantMessage("正在生成计划...")
+                    if (data.content) {
+                      console.log("data.content", data.content)
+                      streamedContent += data.content
+                      if (lexer) {
+                        lexer.AppendString(data.content)
                         try {
-                          const parsedJson = JSON.parse(streamedContent)
-                          finalContent = `\`\`\`json\n${JSON.stringify(parsedJson, null, 2)}\n\`\`\``
+                          const completedJson = lexer.CompleteJSON()
+                          setDetailContent((prev) => (prev ? { ...prev, content: JSON.parse(completedJson) } : null))
                         } catch (e) {
-                          console.error("解析 planning JSON 失败", e)
-                          finalContent = `\`\`\`\n${streamedContent}\n\`\`\``
+                          console.warn("Streaming JSON completion error, waiting for more data.", e)
+                          // 如果补全失败，暂时显示原始字符串
+                          setDetailContent((prev) => (prev ? { ...prev, content: streamedContent } : null))
                         }
                       }
-                      setDetailContent({ ...detail, content: finalContent })
-
-                      const finalAiResponse: ChatMessage = {
-                        ...placeholderAiResponse,
-                        content: generateResponse(targetAgent, userContent),
-                        detailContent: finalContent,
-                        actions: generateMessageActions(targetAgent),
-                      }
-
-                      setMessages((prev) => {
-                        const updated = prev.map((msg) =>
-                          msg.id === assistantMessageId ? finalAiResponse : msg,
-                        )
-                        onUpdateChatMessages?.(targetChatId, updated)
-                        return updated
-                      })
-                      setLoading(false)
-                      return
-                  }
+                    }
+                    break
+                  case "requirements_message":
+                    updateAssistantMessage("正在生成需求...")
+                    break
+                  case "coding_message":
+                    updateAssistantMessage("正在生成代码...")
+                    if (data.content) {
+                      streamedContent += data.content
+                      // 实时更新详情内容
+                      setDetailContent((prev) => (prev ? { ...prev, content: streamedContent } : null))
+                    }
+                    break
+                  default:
+                    // 忽略未知事件
+                    break
                 }
+              } catch (e) {
+                console.error("解析 SSE 数据失败", e)
               }
             }
-          }
-        }
-        await processStream()
+          },
+
+          onclose: () => {
+            // 流关闭后处理最终内容
+            let finalContent: string | object = streamedContent
+            if (targetAgent === "planning") {
+              try {
+                // 尝试最终解析
+                finalContent = JSON.parse(streamedContent)
+              } catch (e) {
+                console.error("Final JSON parsing failed", e)
+                // 如果不是有效的 JSON，则按原样显示
+                finalContent = `\`\`\`\n${streamedContent}\n\`\`\``
+              }
+            } else if (targetAgent === "coding") {
+              // 对于代码，始终将其视为纯文本
+              finalContent = `\`\`\`\n${streamedContent}\n\`\`\``
+            }
+            // 更新最终的详情内容
+            setDetailContent((prev) => (prev ? { ...prev, content: finalContent } : null))
+
+            const finalAiResponse: ChatMessage = {
+              ...placeholderAiResponse,
+              content: generateResponse(targetAgent, userContent),
+              detailContent: finalContent,
+              actions: generateMessageActions(targetAgent),
+            }
+
+            setMessages((prev) => {
+              const updated = prev.map((msg) => (msg.id === assistantMessageId ? finalAiResponse : msg))
+              onUpdateChatMessages?.(targetChatId, updated)
+              return updated
+            })
+            setLoading(false)
+          },
+
+          onerror: (err) => {
+            // fetchEventSource 会自动重试，只有在这里抛出错误才会真正停止
+            // 如果我们不希望它重试，就在这里抛出错误
+            // 否则可以只记录错误，让它继续
+            ctrl.abort() // 出现错误时停止
+            throw err // 抛出错误以触发下面的 catch 块
+          },
+        })
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "生成响应时出错"
         setError(errorMessage)
@@ -266,7 +299,11 @@ export function useMessages(
         case "copy":
           // 复制详细内容
           if (message.role === "assistant" && message.detailContent) {
-            navigator.clipboard.writeText(message.detailContent).then(() => {
+            const contentToCopy =
+              typeof message.detailContent === "object"
+                ? JSON.stringify(message.detailContent, null, 2)
+                : message.detailContent
+            navigator.clipboard.writeText(contentToCopy).then(() => {
               toast.success("复制成功", {
                 description: `内容已复制到剪贴板`,
               })
@@ -286,14 +323,27 @@ export function useMessages(
               return
             }
             // 使用消息中存储的详细内容作为下一阶段的初始消息
-            console.log("Calling onNextStage with:", nextAgent, message.detailContent.substring(0, 50) + "...")
-            onNextStage(nextAgent, message.detailContent)
+            const contentForNextStage =
+              typeof message.detailContent === "object"
+                ? JSON.stringify(message.detailContent, null, 2)
+                : message.detailContent
+
+            console.log(
+              "Calling onNextStage with:",
+              nextAgent,
+              contentForNextStage.substring(0, 50) + "...",
+            )
+            onNextStage(nextAgent, contentForNextStage)
           }
           break
 
         case "export":
           if (agent === "coding" && message.role === "assistant" && message.detailContent) {
-            const blob = new Blob([message.detailContent], { type: "text/markdown" })
+            const contentToExport =
+              typeof message.detailContent === "object"
+                ? JSON.stringify(message.detailContent, null, 2)
+                : message.detailContent
+            const blob = new Blob([contentToExport], { type: "text/markdown" })
             const url = URL.createObjectURL(blob)
             const a = document.createElement("a")
             a.href = url
