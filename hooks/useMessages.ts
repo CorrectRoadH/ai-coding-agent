@@ -32,7 +32,7 @@ function getInitialSteps(agent: AgentType): Step[] {
         { id: "query_database", title: "查询知识库", status: "pending" },
         { id: "query_context", title: "查询上下文", status: "pending" },
         { id: "agent_call", title: "调用 Agent", status: "pending" },
-        { id: "requirements_message", title: "生成需求", status: "pending" },
+        { id: "plan_message", title: "生成需求", status: "pending" },
       ]
     case "planning":
       return [

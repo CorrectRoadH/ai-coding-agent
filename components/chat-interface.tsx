@@ -95,7 +95,7 @@ export default function ChatInterface({
           messages.map((message) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[80%] rounded-lg p-3 ${
+                className={`max-w-[50%] rounded-lg p-3 break-all ${
                   message.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900"
                 }`}
               >
@@ -110,6 +110,9 @@ export default function ChatInterface({
                       />
                     ),
                     p: ({ node, ...props }) => <p className="my-2 first:mt-0 last:mb-0" {...props} />,
+                    pre: ({ node, ...props }) => (
+                      <pre {...props} className="whitespace-pre-wrap break-all" />
+                    ),
                   }}
                 >
                   {message.content}
