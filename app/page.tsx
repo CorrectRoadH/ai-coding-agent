@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Sidebar from "@/components/sidebar"
 import AgentSelection from "@/components/agent-selection"
 import ChatInterface from "@/components/chat-interface"
@@ -13,6 +13,7 @@ import type { AgentType, MessageAction } from "@/types/agent"
 export default function Home() {
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const [autoSendMessage, setAutoSendMessage] = useState<string | null>(null)
 
   // 使用自定义hook获取对话列表
   const {
@@ -59,22 +60,8 @@ export default function Home() {
     setMessagesData,
   } = useMessages(selectedChatId, selectedAgent, updateChatMessages, handleNextStage)
 
-  // 处理新建对话
-  const handleNewChat = () => {
-    setSelectedAgent(null)
-    setSelectedChatId(null)
-    clearMessages()
-  }
-
-  // 处理选择Agent
-  const handleAgentSelect = async (agent: AgentType) => {
-    setSelectedAgent(agent)
-    setSelectedChatId(null)
-    clearMessages()
-  }
-
   // 处理发送消息 - 修复新建对话时的消息发送问题
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = useCallback(async (content: string) => {
     if (!selectedAgent) return
 
     // 如果是新对话（没有选中的chatId），先创建对话
@@ -91,6 +78,31 @@ export default function Home() {
     } else {
       // 使用现有的对话ID发送消息
       await sendMessage(content)
+    }
+  }, [selectedAgent, selectedChatId, createChatOptimistic, sendMessageWithChatId, sendMessage, setSelectedChatId])
+
+  useEffect(() => {
+    if (autoSendMessage && selectedAgent) {
+      handleSendMessage(autoSendMessage)
+      setAutoSendMessage(null)
+    }
+  }, [autoSendMessage, selectedAgent, handleSendMessage])
+
+  // 处理新建对话
+  const handleNewChat = () => {
+    setSelectedAgent(null)
+    setSelectedChatId(null)
+    clearMessages()
+  }
+
+  // 处理选择Agent
+  const handleAgentSelect = async (agent: AgentType, initialMessage?: string) => {
+    setSelectedAgent(agent)
+    setSelectedChatId(null)
+    clearMessages()
+
+    if (initialMessage) {
+      setAutoSendMessage(initialMessage)
     }
   }
 
