@@ -22,13 +22,13 @@ export interface Step {
   id: string
   title: string
   status: "pending" | "in_progress" | "completed" | "error"
-  content?: any
+  content?: string | object
 }
 
 export interface DetailContent {
   id: string
   title: string
-  content: string | object | Step[]
+  content: Step[] | string | object
 }
 
 export interface ChatHistoryItem {

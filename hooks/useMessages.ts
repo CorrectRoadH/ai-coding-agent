@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { fetchEventSource, type EventSourceMessage } from "@microsoft/fetch-event-source"
 import type { ChatMessage, AgentType, DetailContent, MessageAction, Step } from "@/types/agent"
 import { toast } from "sonner"
@@ -64,6 +64,18 @@ export function useMessages(
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { getAgentTitle, generateMessageActions } = useAgents() // 从 useAgents 导入
+  const isStreaming = useRef(false) // 使用 useRef 跟踪流状态
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    return () => {
+      // 组件卸载时，中止任何正在进行的请求
+      if (abortControllerRef.current) {
+        console.log("组件卸载，中止请求...")
+        abortControllerRef.current.abort()
+      }
+    }
+  }, []) // 空依赖数组确保只在挂载和卸载时运行
 
   // 获取消息
   const fetchMessages = useCallback(async (chatId: string) => {
@@ -88,6 +100,12 @@ export function useMessages(
       targetAgent: AgentType,
       currentMessages: ChatMessage[],
     ) => {
+      console.log("targetAgent", targetAgent)
+      if (isStreaming.current) {
+        console.warn("一个流式响应已经在进行中，已阻止新的请求。")
+        return
+      }
+      isStreaming.current = true
       setLoading(true)
       setError(null)
 
@@ -137,7 +155,23 @@ export function useMessages(
         }
 
         let streamedContent = ""
+        // 为 JSON 流新增一个原始缓冲区，用于去重处理
+        let rawJsonBuffer = ""
+
+        // 工具函数：计算 newChunk 中与 prevBuffer 重叠的最长前缀长度，
+        // 仅返回去掉重叠部分后的新增内容。
+        const getNonOverlappingPart = (prev: string, next: string) => {
+          const maxOverlap = Math.min(prev.length, next.length)
+          for (let i = maxOverlap; i > 0; i--) {
+            if (prev.slice(-i) === next.slice(0, i)) {
+              return next.slice(i)
+            }
+          }
+          return next
+        }
+
         const ctrl = new AbortController()
+        abortControllerRef.current = ctrl
         let lexer: any
         if (targetAgent === "planning" || targetAgent === "coding") {
           lexer = new streamingjson.Lexer()
@@ -169,7 +203,7 @@ export function useMessages(
               ctrl.abort() // 正常结束时关闭连接
               return
             }
-
+            console.log("event", event)
             if (event.data) {
               try {
                 const data = JSON.parse(event.data)
@@ -210,33 +244,44 @@ export function useMessages(
                     }
                     if (step.id === eventId) {
                       eventFound = true
-                      let stepContent: any = step.content
+                      const isStreamableJsonEvent =
+                        (eventId === "plan_message" || eventId === "coding_message") && lexer
+
+                      const isAgentCall = eventId === "query_database" || eventId === "query_context" || eventId === "agent_call"
                       if (data.content) {
-                        const isStreamableJsonEvent =
-                          (eventId === "plan_message" || eventId === "coding_message") && lexer
-
+                        if (isAgentCall) {
+                          streamedContent = JSON.stringify(data.content)
+                          return { ...step, status: "in_progress" as const, content: streamedContent }
+                        }
                         if (isStreamableJsonEvent) {
-                          streamedContent += data.content
                           try {
-                            console.log("streamedContent",data.content, streamedContent)
-                            lexer.AppendString(streamedContent)
+                            // 先计算新增的（非重复）部分再追加到 lexer
+                            const uniquePart = getNonOverlappingPart(rawJsonBuffer, data.content)
+                            if (uniquePart) {
+                              rawJsonBuffer += uniquePart
+                              lexer.AppendString(uniquePart)
+                            }
 
-                            const completedJson = lexer.CompleteJSON()
-                            stepContent = JSON.parse(completedJson)
-                            // 关键修复：在成功解析后，重置lexer以防止重复解析旧内容
-                            lexer = new streamingjson.Lexer()
-                            streamedContent = "" // 关键修复：同时重置 streamedContent
+                            try {
+                              // 如果 JSON 已经完整，获取其完整内容
+                              const completed = lexer.CompleteJSON()
+                              if (completed) {
+                                streamedContent = JSON.parse(completed)
+                              }
+                            } catch {
+                              // JSON 仍未完整，忽略
+                            }
                           } catch (e) {
-                            // JSON不完整，暂时不更新内容，等待更多数据
-                            // console.log("Incomplete JSON, waiting for more data...", streamedContent)
+                            console.log("JSON 解析失败，等待更多数据...", e)
                           }
                         } else {
-                          // 对于非流式JSON内容或其他事件，目前不进行累加，因为可能导致格式问题
+                          // 对于普通文本流，继续累加
+                          streamedContent += data.content
                         }
                       }
-                      return { ...step, status: "in_progress", content: stepContent }
+                      return { ...step, status: "in_progress" as const, content: streamedContent }
                     }
-                    return { ...step, status: "completed" }
+                    return { ...step, status: "completed" as const }
                   })
 
                   return { ...prev, content: updatedSteps }
@@ -276,7 +321,7 @@ export function useMessages(
 
                 return {
                   ...step,
-                  status: step.status !== "pending" ? "completed" : "pending",
+                  status: step.status !== "pending" ? ("completed" as const) : ("pending" as const),
                   content: finalStepContent,
                 }
               })
@@ -296,6 +341,8 @@ export function useMessages(
               return updated
             })
             setLoading(false)
+            isStreaming.current = false // 重置流状态
+            abortControllerRef.current = null
           },
 
           onerror: (err) => {
@@ -303,18 +350,26 @@ export function useMessages(
             // 如果我们不希望它重试，就在这里抛出错误
             // 否则可以只记录错误，让它继续
             ctrl.abort() // 出现错误时停止
+            isStreaming.current = false // 重置流状态
+            abortControllerRef.current = null
             throw err // 抛出错误以触发下面的 catch 块
           },
         })
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "生成响应时出错"
-        setError(errorMessage)
-        const errorAiResponse: ChatMessage = {
-          ...placeholderAiResponse,
-          content: `错误: ${errorMessage}`,
+        if (err instanceof Error && err.name === "AbortError") {
+          console.log("请求被成功中止。")
+        } else {
+          const errorMessage = err instanceof Error ? err.message : "生成响应时出错"
+          setError(errorMessage)
+          const errorAiResponse: ChatMessage = {
+            ...placeholderAiResponse,
+            content: `错误: ${errorMessage}`,
+          }
+          setMessages((prev) => prev.map((msg) => (msg.id === assistantMessageId ? errorAiResponse : msg)))
         }
-        setMessages((prev) => prev.map((msg) => (msg.id === assistantMessageId ? errorAiResponse : msg)))
         setLoading(false)
+        isStreaming.current = false // 发生错误时也要重置
+        abortControllerRef.current = null
       }
     },
     [getAgentTitle, generateMessageActions, onUpdateChatMessages],
@@ -323,6 +378,8 @@ export function useMessages(
   // 发送消息
   const sendMessage = useCallback(
     async (content: string) => {
+      console.log("sendMessage", agent, chatId)
+
       if (!agent || !chatId) return null
 
       await _generateStreamingResponse(content, chatId, agent, messages)
