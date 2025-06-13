@@ -121,18 +121,19 @@ export function useMessages(
       onUpdateChatMessages?.(targetChatId, messagesWithUser)
 
       const assistantMessageId = crypto.randomUUID()
+      const initialSteps = getInitialSteps(targetAgent)
       const placeholderAiResponse: ChatMessage = {
         id: assistantMessageId,
         content: "思考中...",
         role: "assistant",
         timestamp: new Date(),
         actions: [],
-        detailContent: "",
+        detailContent: initialSteps,
       }
 
       setMessages((prevMessages) => [...prevMessages, placeholderAiResponse])
 
-      const initialSteps = getInitialSteps(targetAgent)
+      // 初始化右侧详情面板，展示步骤进度
       const detail: DetailContent = {
         id: assistantMessageId,
         title: `${getAgentTitle(targetAgent)} 过程`,
@@ -169,6 +170,9 @@ export function useMessages(
           }
           return next
         }
+
+        // 用于跨 onmessage 与 onclose 共享的步骤数据
+        let finalStepsForMessage: Step[] = initialSteps
 
         const ctrl = new AbortController()
         abortControllerRef.current = ctrl
@@ -237,13 +241,8 @@ export function useMessages(
                 setDetailContent((prev) => {
                   if (!prev || !Array.isArray(prev.content)) return prev
 
-                  let eventFound = false
                   const updatedSteps = (prev.content as Step[]).map((step) => {
-                    if (eventFound) {
-                      return step // 未来的步骤保持不变
-                    }
                     if (step.id === eventId) {
-                      eventFound = true
                       const isStreamableJsonEvent =
                         (eventId === "plan_message" || eventId === "coding_message") && lexer
 
@@ -284,6 +283,9 @@ export function useMessages(
                     return { ...step, status: "completed" as const }
                   })
 
+                  // 将最终步骤保存在外部变量中，供后续写入消息
+                  finalStepsForMessage = updatedSteps
+
                   return { ...prev, content: updatedSteps }
                 })
               } catch (e) {
@@ -304,34 +306,12 @@ export function useMessages(
               }
             }
 
-            // 更新最终的详情内容和步骤状态
-            setDetailContent((prev) => {
-              if (!prev || !Array.isArray(prev.content)) return prev
-
-              const finalSteps = (prev.content as Step[]).map((step) => {
-                const isContentStep =
-                  (targetAgent === "planning" && step.id === "plan_message") ||
-                  (targetAgent === "coding" && step.id === "coding_message") ||
-                  (targetAgent === "requirements" && step.id === "requirements_message")
-
-                let finalStepContent = step.content
-                if (isContentStep) {
-                  finalStepContent = finalContentForMessage
-                }
-
-                return {
-                  ...step,
-                  status: step.status !== "pending" ? ("completed" as const) : ("pending" as const),
-                  content: finalStepContent,
-                }
-              })
-              return { ...prev, content: finalSteps }
-            })
-
+            // 更新最终的详情内容和步骤状态，同时把最终步骤保存下来，稍后存入消息
             const finalAiResponse: ChatMessage = {
               ...placeholderAiResponse,
               content: generateResponse(targetAgent, userContent),
-              detailContent: finalContentForMessage, // 消息中存储最终产物
+              // 将完整步骤数组存入消息，方便后续"查看详情"
+              detailContent: finalStepsForMessage.length > 0 ? finalStepsForMessage : finalContentForMessage,
               actions: generateMessageActions(targetAgent),
             }
 
@@ -446,11 +426,18 @@ export function useMessages(
             } else {
               return
             }
-            // 使用消息中存储的详细内容作为下一阶段的初始消息
+            // 当 detailContent 为步骤数组时，提取最后一步的 content 作为下一阶段输入
+            let payload: string | object | undefined = undefined
+
+            if (Array.isArray(message.detailContent)) {
+              const lastStep = message.detailContent[message.detailContent.length - 1]
+              payload = lastStep?.content
+            } else {
+              payload = message.detailContent
+            }
+
             const contentForNextStage =
-              typeof message.detailContent === "object"
-                ? JSON.stringify(message.detailContent, null, 2)
-                : message.detailContent
+              typeof payload === "object" ? JSON.stringify(payload, null, 2) : (payload ?? "")
 
             console.log(
               "Calling onNextStage with:",

@@ -6,7 +6,7 @@ export interface ChatMessage {
   role: "user" | "assistant"
   timestamp: Date
   actions?: MessageAction[]
-  detailContent?: string | object // 添加详细内容字段, 支持对象
+  detailContent?: string | object | Step[] // 添加详细内容字段, 支持对象和步骤数组
 }
 
 export interface MessageAction {
