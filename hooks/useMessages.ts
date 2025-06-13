@@ -204,6 +204,18 @@ export function useMessages(
 
           onmessage: (event: EventSourceMessage) => {
             if (event.event === "message_end") {
+              // 当收到 message_end 事件时，将所有步骤标记为完成
+              setDetailContent((prev) => {
+                if (!prev || !Array.isArray(prev.content)) {
+                  return prev
+                }
+                const updatedSteps = (prev.content as Step[]).map((step) => ({
+                  ...step,
+                  status: "completed" as const,
+                }))
+                finalStepsForMessage = updatedSteps
+                return { ...prev, content: updatedSteps }
+              })
               ctrl.abort() // 正常结束时关闭连接
               return
             }
@@ -241,12 +253,22 @@ export function useMessages(
                 setDetailContent((prev) => {
                   if (!prev || !Array.isArray(prev.content)) return prev
 
+                  let currentStepReached = false
                   const updatedSteps = (prev.content as Step[]).map((step) => {
+                    // 如果已经处理完当前步骤，则后续步骤保持原样（pending）
+                    if (currentStepReached) {
+                      return step
+                    }
+
+                    // 如果是当前事件对应的步骤
                     if (step.id === eventId) {
+                      currentStepReached = true
                       const isStreamableJsonEvent =
                         (eventId === "plan_message" || eventId === "coding_message") && lexer
 
-                      const isAgentCall = eventId === "query_database" || eventId === "query_context" || eventId === "agent_call"
+                      const isAgentCall =
+                        eventId === "query_database" || eventId === "query_context" || eventId === "agent_call"
+
                       if (data.content) {
                         if (isAgentCall) {
                           streamedContent = JSON.stringify(data.content)
@@ -254,32 +276,30 @@ export function useMessages(
                         }
                         if (isStreamableJsonEvent) {
                           try {
-                            // 先计算新增的（非重复）部分再追加到 lexer
                             const uniquePart = getNonOverlappingPart(rawJsonBuffer, data.content)
                             if (uniquePart) {
                               rawJsonBuffer += uniquePart
                               lexer.AppendString(uniquePart)
                             }
-
                             try {
-                              // 如果 JSON 已经完整，获取其完整内容
                               const completed = lexer.CompleteJSON()
                               if (completed) {
                                 streamedContent = JSON.parse(completed)
                               }
                             } catch {
-                              // JSON 仍未完整，忽略
+                              // JSON 仍未完整
                             }
                           } catch (e) {
                             console.log("JSON 解析失败，等待更多数据...", e)
                           }
                         } else {
-                          // 对于普通文本流，继续累加
                           streamedContent += data.content
                         }
                       }
                       return { ...step, status: "in_progress" as const, content: streamedContent }
                     }
+
+                    // 当前事件之前的步骤，标记为完成
                     return { ...step, status: "completed" as const }
                   })
 

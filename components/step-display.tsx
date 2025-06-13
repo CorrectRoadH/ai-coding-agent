@@ -40,13 +40,22 @@ const StepDisplay = ({ step }: StepDisplayProps) => {
         </p>
         {step.content && (
           <div className="mt-2 rounded-lg border bg-gray-50 p-4">
-            {isPlan ? (
-              <PlanDisplay plan={step.content} />
-            ) : isCode ? (
-                <pre className="prose prose-sm max-w-none whitespace-pre-wrap break-words">{step.content}</pre>
-            ) : hasSimpleContent ? (
-                <p className="text-sm text-gray-600">{step.content}</p>
-            ) : null}
+            {(() => {
+              if (isPlan) {
+                return <PlanDisplay plan={step.content as any} />
+              }
+              if (typeof step.content === "string") {
+                if (step.content.startsWith("```")) {
+                  return (
+                    <pre className="prose prose-sm max-w-none whitespace-pre-wrap break-words">
+                      {step.content}
+                    </pre>
+                  )
+                }
+                return <p className="text-sm text-gray-600">{step.content}</p>
+              }
+              return null
+            })()}
           </div>
         )}
       </div>

@@ -156,7 +156,7 @@ export default function Home() {
         )}
       </div>
 
-      <ResizablePanel defaultWidth={320} minWidth={280} maxWidth={600} side="right">
+      <ResizablePanel defaultWidth={600} minWidth={280} maxWidth={800} side="right">
         <DetailsPanel detailContent={detailContent} />
       </ResizablePanel>
     </div>
