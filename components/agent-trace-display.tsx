@@ -113,7 +113,7 @@ const AgentTraceDisplay: React.FC<AgentTraceDisplayProps> = ({ data }) => {
                       {!isActionCollapsed && (
                         <div className="prose prose-sm max-w-none pt-2 text-gray-700">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {(action.result || '').replace(/\\n/g, '\n')}
+                            {(action.result || '')}
                           </ReactMarkdown>
                         </div>
                       )}
