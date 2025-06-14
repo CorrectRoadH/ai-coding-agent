@@ -12,10 +12,11 @@ export interface ChatMessage {
 export interface MessageAction {
   id: string
   label: string
-  type: "detail" | "copy" | "next-stage" | "export"
+  type: "detail" | "copy" | "next-stage" | "export" | "link"
   variant?: "default" | "outline" | "secondary"
   icon?: string
   disabled?: boolean
+  href?: string
 }
 
 export interface Step {

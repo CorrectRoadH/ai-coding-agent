@@ -71,6 +71,14 @@ export function useAgents() {
             variant: "default",
             icon: "ArrowRight",
           },
+          {
+            id: "open-github",
+            label: "在 GitHub 打开",
+            type: "link",
+            variant: "outline",
+            icon: "Github",
+            href: "https://github.com/aict-poc/awesome-ai-hub/issues/10"
+          },
         ]
       case "planning":
         return [
@@ -103,6 +111,14 @@ export function useAgents() {
             icon: "Code",
             disabled: true, // 将此按钮禁用
           },
+          {
+            id: "open-github",
+            label: "在 GitHub 打开",
+            type: "link",
+            variant: "outline",
+            icon: "Github",
+            href: "https://github.com/aict-poc/awesome-ai-hub/issues/10"
+          },
         ]
       case "coding":
         return [
@@ -133,6 +149,14 @@ export function useAgents() {
             type: "export",
             variant: "secondary",
             icon: "Download",
+          },
+          {
+            id: "open-github",
+            label: "在 GitHub 打开",
+            type: "link",
+            variant: "outline",
+            icon: "Github",
+            href: "https://github.com/aict-poc/awesome-ai-hub/issues/10"
           },
         ]
       default:

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import type { ChatHistoryItem, AgentType } from "@/types/agent"
 import { useAgents } from "./useAgents" // 导入 useAgents hook
+import { v4 as uuidv4 } from "uuid"
 
 // 模拟初始数据，实际应用中可以从API获取
 const initialChats: ChatHistoryItem[] = [
@@ -113,7 +114,7 @@ export function useChats() {
         targetAgent: AgentType,
       ) => Promise<null>,
     ) => {
-      const tempId = crypto.randomUUID()
+      const tempId = uuidv4()
       const agentTitle = getAgentTitle(agent)
       const title = `${agentTitle}：${firstMessage.slice(0, 15)}${
         firstMessage.length > 15 ? "..." : ""
@@ -166,7 +167,7 @@ export function useChats() {
       // 模拟API调用
       await new Promise((resolve) => setTimeout(resolve, 300))
       const newChat: ChatHistoryItem = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         title,
         agent,
         messages: [],

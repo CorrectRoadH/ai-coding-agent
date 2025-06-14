@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import type { AgentType, ChatMessage, MessageAction } from "@/types/agent"
-import { ArrowLeft, Send, Loader2, FileText, Copy, ArrowRight, Code, Download } from "lucide-react"
+import { ArrowLeft, Send, Loader2, FileText, Copy, ArrowRight, Code, Download, Github } from "lucide-react"
 import { useAgents } from "@/hooks/useAgents"
 import DetailsPanel from "./details-panel"
 import ReactMarkdown from "react-markdown"
@@ -28,6 +28,7 @@ const iconMap = {
   ArrowRight,
   Code,
   Download,
+  Github,
 }
 
 export default function ChatInterface({

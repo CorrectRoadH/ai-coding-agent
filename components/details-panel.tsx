@@ -1,8 +1,9 @@
-import type { DetailContent, Step } from "@/types/agent"
+import type { DetailContent } from "@/types/agent"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useEffect, useRef, ElementRef } from "react"
-import PlanDisplay from "./plan-display"
-import StepDisplay from "./step-display"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import GenericDisplay from "./generic-display"
 
 interface DetailsPanelProps {
   detailContent: DetailContent | null
@@ -11,8 +12,9 @@ interface DetailsPanelProps {
 export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
   const scrollAreaRef = useRef<ElementRef<typeof ScrollArea>>(null)
 
-  const isSteps = Array.isArray(detailContent?.content)
-  const isPlan = typeof detailContent?.content === "object" && detailContent?.content !== null && !isSteps
+  const content = detailContent?.content
+  const isObject = typeof content === "object" && content !== null
+  const isString = typeof content === "string"
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -20,13 +22,12 @@ export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
       if (viewport) {
         setTimeout(() => {
           viewport.scrollTop = viewport.scrollHeight
-            
         }, 100)
       }
     }
-  }, [detailContent, isSteps, isPlan])
+  }, [detailContent])
 
-  const hasContent = detailContent && (isSteps || isPlan || (typeof detailContent.content === 'string' && detailContent.content.length > 0));
+  const hasContent = detailContent && (isObject || (isString && (content as string).length > 0))
 
   return (
     <div className="bg-white border-l border-gray-200 flex flex-col h-full w-full">
@@ -36,19 +37,13 @@ export default function DetailsPanel({ detailContent }: DetailsPanelProps) {
             <h2 className="my-auto text-lg font-semibold">{detailContent.title}</h2>
           </div>
           <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
-             <div className="p-4 space-y-4">
-              {isSteps ? (
-                (detailContent?.content as Step[]).map((step, index) => (
-                  <StepDisplay key={index} step={step} />
-                ))
-              ) : isPlan ? (
-                <PlanDisplay plan={detailContent.content as any} />
-              ) : (
-                <pre className="prose prose-sm max-w-none whitespace-pre-wrap break-words">
-                  {typeof detailContent.content === "string" ? detailContent.content : ""}
-                </pre>
-              )}
-             </div>
+            <div className="p-4 space-y-4">
+              {isObject ? (
+                <GenericDisplay data={content} />
+              ) : isString ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content as string}</ReactMarkdown>
+              ) : null}
+            </div>
           </ScrollArea>
         </>
       ) : (

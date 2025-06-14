@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { PlusCircle, Loader2, X } from "lucide-react"
 import type { ChatHistoryItem, AgentType } from "@/types/agent"
 import { useAgents } from "@/hooks/useAgents"
+import Link from "next/link"
 
 interface SidebarProps {
   chatHistory: ChatHistoryItem[]
@@ -37,7 +38,7 @@ export default function Sidebar({
   return (
     <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
       <div className="flex h-20 border-b border-gray-200">
-        <h2 className="m-auto text-lg font-semibold">AI Coding</h2>
+        <h2 className="m-auto text-lg font-semibold">DragonCodeAI</h2>
       </div>
 
       <div className="p-4">
@@ -83,12 +84,14 @@ export default function Sidebar({
         )}
       </div>
 
-      <div className="flex h-20 border-t border-gray-200">
-        <div className="flex m-auto items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-gray-300"></div>
-          <div className="text-sm font-medium">AIAE超管</div>
+      <Link href="/dashboard">
+        <div className="flex h-20 border-t border-gray-200 cursor-pointer hover:bg-gray-100">
+          <div className="flex m-auto items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-gray-300"></div>
+            <div className="text-sm font-medium">AIAE超管</div>
+          </div>
         </div>
-      </div>
+      </Link>
     </div>
   )
 }
