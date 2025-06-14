@@ -31,19 +31,19 @@ const agentStats: Record<AgentType, AgentStat> = {
     ongoing: 0,
     completed: 10,
     timeSaved: "10h",
-    costSaved: "$100",
+    costSaved: "¥ 1000",
   },
   planning: {
     ongoing: 1,
     completed: 9,
     timeSaved: "9h",
-    costSaved: "$900",
+    costSaved: "¥ 9000",
   },
   coding: {
     ongoing: 0,
     completed: 9,
     timeSaved: "25h",
-    costSaved: "$25,000",
+    costSaved: "¥ 25000",
     attribution: [
       { name: "Copilot", icon: <Github className="h-5 w-5" /> },
       { name: "Cursor", icon: <Briefcase className="h-5 w-5" /> },
