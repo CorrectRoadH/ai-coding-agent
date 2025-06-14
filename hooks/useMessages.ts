@@ -157,9 +157,6 @@ export function useMessages(
           onmessage: (event: EventSourceMessage) => {
             if (event.event === "message_end" || event.data === "[DONE]") {
               ctrl.abort() // 正常结束时关闭连接
-              setLoading(false)
-              isStreaming.current = false // 重置流状态
-              abortControllerRef.current = null
               return
             }
             
