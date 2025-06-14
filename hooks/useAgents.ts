@@ -152,7 +152,7 @@ export function useAgents() {
           },
           {
             id: "open-github",
-            label: "在 GitHub 打开",
+            label: "评审通过，在 GitHub 打开",
             type: "link",
             variant: "outline",
             icon: "Github",
