@@ -8,7 +8,7 @@ import { useAgents } from "./useAgents" // 导入 useAgents hook
 import * as streamingjson from "streaming-json"
 import { v4 as uuidv4 } from "uuid"
 
-const API_BASE_URL = "http://192.168.75.37:10002/api"
+const API_BASE_URL = "http://121.40.57.85:30001/api"
 
 // 生成简短响应内容的辅助函数
 function generateResponse(agent: AgentType | null, message: string): string {
